@@ -1,55 +1,57 @@
 $servers = Get-Content C:\servers.txt
+$logstashService = "logstash-forwarder-master.exe"
+
+Function ServiceActions($server, $action, $servicename)
+{
+    SC.EXE \\$server $action $servicename | Out-Null
+    sleep 5
+}
+
+Function GetDiskSpaceWmi ($server, $servicename)
+{
+    $i = Get-WmiObject -ComputerName $server win32_logicaldisk | where { $_.DeviceId -match "L:" } | select FreeSpace
+    $freeSpaceInDrive = $i.FreeSpace.ToString()
+    Write-Host "Before $server disk freespace is $freeSpaceInDrive"
+    return $freeSpaceInDrive
+}
+
+Function DeleteLogs($server)
+{
+    $files = Get-ChildItem -Path "\\$server\l$\IISLOG" -Filter *.log -Recurse
+    
+    foreach ($file in $files)
+    {
+        Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
+    }
+
+
+    $files = Get-ChildItem -Path "\\$server\l$" -Filter *.txt -Recurse
+    
+    foreach ($file in $files)
+    {
+        Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
+    }
+}
 
 foreach($server in $servers)
 {
     
-    if( Get-Service -ComputerName $server -Name "logstash-forwarder-master.exe" -ErrorAction SilentlyContinue)
+    if( Get-Service -ComputerName $server -Name $logstashService -ErrorAction SilentlyContinue)
     {
-        $i = Get-WmiObject -ComputerName $server win32_logicaldisk | where { $_.DeviceId -match "L:" } | select FreeSpace
-        $before = $i.FreeSpace.ToString()
-        Write-Host "Before $server disk freespace is $before"
-        sc.exe \\$server stop logstash-forwarder | Out-Null
-        sleep 5
-        $files = Get-ChildItem -Path "\\$server\l$\IISLOG" -Filter *.log -Recurse
-    
-        foreach ($file in $files)
-        {
-            Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
-        }
-
-
-        $files = Get-ChildItem -Path "\\$server\l$" -Filter *.txt -Recurse
-    
-        foreach ($file in $files)
-        {
-            Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
-        }
-
-        $z = Get-WmiObject -ComputerName $server win32_logicaldisk | where { $_.DeviceId -match "L:" } | select FreeSpace
-        $after = $z.FreeSpace.ToString()
-        Write-Host "After $server disk freespace is $after"
+        $before = GetDiskSpaceWmi($server,$logstashService)
+        ServiceActions($server, "stop", $logstashService)
+        DeleteLogs($server)
+        $after = GetDiskSpaceWmi($server,$logstashService)
         $gained = $after - $before
         Write-Host "$server space gained $gained"
-        sc.exe \\$server start logstash-forwarder | Out-Null
+        ServiceActions($server, "start", $logstashService)
     }
     else
     {
-        $i = Get-WmiObject -ComputerName $server win32_logicaldisk | where { $_.DeviceId -match "L:" } | select FreeSpace
-        $before = $i.FreeSpace.ToString()
-        Write-Host "Before $server disk freespace is $before"
-
-        $files = Get-ChildItem -Path "\\$server\l$\IISLOG" -Filter *.log -Recurse
-    
-        foreach ($file in $files)
-        {
-            Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
-        }
-
-        $z = Get-WmiObject -ComputerName $server win32_logicaldisk | where { $_.DeviceId -match "L:" } | select FreeSpace
-        $after = $z.FreeSpace.ToString()
-        Write-Host "After $server disk freespace is $after"
+        $before = GetDiskSpaceWmi($server,$logstashService)
+        DeleteLogs($server)
+        $after = GetDiskSpaceWmi($server,$logstashService)
         $gained = $after - $before
         Write-Host "$server space gained $gained"
-
     }
 }
