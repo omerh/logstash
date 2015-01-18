@@ -1,0 +1,14 @@
+{
+    "network": {
+        "servers": [ "server:port" ],        
+        "ssl ca": "logstash-forwarder.crt"
+    },
+	"files": [
+		{
+		  "paths": [ 
+			"L:\\*.txt"
+		  ],
+		  "fields": { "type": "log4net" }
+		}	
+    ]
+}
