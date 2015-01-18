@@ -1,7 +1,7 @@
 {
     "network": {
         "servers": [ "server:port" ],        
-        "ssl ca": "logstash-forwarder.crt"
+        "ssl ca": "logstash.crt"
     },
 	"files": [
 		{
